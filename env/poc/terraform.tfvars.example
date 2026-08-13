@@ -1,0 +1,27 @@
+project     = "YOUR PROJECT"
+owner       = "YOUR NAME"
+zone        = "NETWORK ZONE"
+environment = "YOUR CURRENT WORKING DIR"
+aws_profile = null
+region      = "YOUR REGION"
+
+vpc_cidr            = "REPLACEME"
+azs                 = ["REPLACEME", "REPLACEME"]
+
+public_subnet_cidrs = ["REPLACEME", "REPLACEME"]
+
+private_subnets = [
+  { name = "REPLACEME-a", cidr = "REPLACEME" },
+  { name = "REPLACEME-c", cidr = "REPLACEME" },
+
+  { name = "REPLACEME-a", cidr = "REPLACEME" },
+  { name = "REPLACEME-c", cidr = "REPLACEME" },
+
+  { name = "REPLACEME-a", cidr = "REPLACEME" },
+  { name = "REPLACEME-c", cidr = "REPLACEME" },
+]
+
+bastion_ssh_cidr    = "REPLACEME"
+
+
+key_pair_name = "REPLACEME"
