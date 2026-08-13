@@ -38,4 +38,7 @@ module "three_tier" {
 
   db_subnet_id         = module.network.private_subnet_ids[4] # db-a
   db_security_group_id = module.network.internal_mysql_security_group_id
+
+  redis_subnet_id         = module.network.private_subnet_ids[2] # backend-a, was_server와 동일 서브넷
+  redis_security_group_id = module.network.internal_redis_security_group_id
 }

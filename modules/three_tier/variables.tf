@@ -66,3 +66,19 @@ variable "db_user_data" {
   type        = string
   default     = null
 }
+
+variable "redis_subnet_id" {
+  description = "Private subnet ID for the Redis server (pass one of the network module's private_subnet_ids)"
+  type        = string
+}
+
+variable "redis_security_group_id" {
+  description = "Security group ID for the Redis server (pass the network module's internal_redis_security_group_id)"
+  type        = string
+}
+
+variable "redis_user_data" {
+  description = "user_data script content for the Redis server. Defaults to scripts/install_redis.sh; pass a value to override."
+  type        = string
+  default     = null
+}

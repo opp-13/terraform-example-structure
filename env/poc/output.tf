@@ -37,3 +37,13 @@ output "db_server_private_ip" {
   description = "DB server private IP address"
   value       = module.three_tier.db_server_private_ip
 }
+
+output "redis_server_instance_id" {
+  description = "Redis server EC2 instance ID"
+  value       = module.three_tier.redis_server_instance_id
+}
+
+output "redis_server_private_ip" {
+  description = "Redis server private IP address"
+  value       = module.three_tier.redis_server_private_ip
+}

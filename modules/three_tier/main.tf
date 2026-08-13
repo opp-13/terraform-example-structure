@@ -45,3 +45,15 @@ module "db_server" {
 
   key_pair_name = var.key_pair_name
 }
+
+module "redis_server" {
+  source = "../compute"
+
+  name                        = "redis_server"
+  subnet_id                   = var.redis_subnet_id
+  security_group_id           = var.redis_security_group_id
+  associate_public_ip_address = false
+  user_data                   = coalesce(var.redis_user_data, file("${path.module}/scripts/install_redis.sh"))
+
+  key_pair_name = var.key_pair_name
+}
