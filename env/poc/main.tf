@@ -25,6 +25,7 @@ module "network" {
 module "three_tier" {
   source = "../../modules/three_tier"
 
+# 인스턴스 설정
   key_pair_name = var.key_pair_name
 
   bastion_subnet_id         = module.network.public_subnet_ids[0]
