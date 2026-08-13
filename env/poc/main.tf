@@ -32,8 +32,8 @@ module "bastion" {
   user_data                   = file("${path.module}/scripts/install_mysql.sh")
 
   key_pair_name    = var.key_pair_name
-  instance_type    = var.bastion_instance_type
-  root_volume_size = var.bastion_root_volume_size
+  instance_type    = "t3.micro"
+  root_volume_size = 16
 }
 
 module "app_server" {
@@ -45,6 +45,6 @@ module "app_server" {
   associate_public_ip_address = false
 
   key_pair_name    = var.key_pair_name
-  instance_type    = var.app_server_instance_type
-  root_volume_size = var.app_server_root_volume_size
+  instance_type    = "t3.micro"
+  root_volume_size = 16
 }

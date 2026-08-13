@@ -39,30 +39,6 @@ variable "key_pair_name" {
   type        = string
 }
 
-variable "bastion_instance_type" {
-  description = "Bastion instance type"
-  type        = string
-  default     = "t3.micro"
-}
-
-variable "bastion_root_volume_size" {
-  description = "Bastion root EBS volume size in GB"
-  type        = number
-  default     = 16
-}
-
-variable "app_server_instance_type" {
-  description = "App server instance type"
-  type        = string
-  default     = "t3.micro"
-}
-
-variable "app_server_root_volume_size" {
-  description = "App server root EBS volume size in GB"
-  type        = number
-  default     = 16
-}
-
 variable "vpc_cidr" {
   description = "VPC CIDR block"
   type        = string
