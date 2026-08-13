@@ -22,29 +22,20 @@ module "network" {
 # name/subnet_id/security_group_id/instance_type/user_data
 
 
-module "bastion" {
-  source = "../../modules/compute"
+module "three_tier" {
+  source = "../../modules/three_tier"
 
-  name                        = "bastion"
-  subnet_id                   = module.network.public_subnet_ids[0]
-  security_group_id           = module.network.bastion_security_group_id
-  associate_public_ip_address = true
-  user_data                   = file("${path.module}/scripts/install_mysql.sh")
+  key_pair_name = var.key_pair_name
 
-  key_pair_name    = var.key_pair_name
-  instance_type    = "t3.micro"
-  root_volume_size = 16
-}
+  bastion_subnet_id         = module.network.public_subnet_ids[0]
+  bastion_security_group_id = module.network.bastion_security_group_id
 
-module "app_server" {
-  source = "../../modules/compute"
+  web_subnet_id         = module.network.private_subnet_ids[0] # frontend-a
+  web_security_group_id = module.network.web_security_group_id
 
-  name                        = "app_server"
-  subnet_id                   = module.network.private_subnet_ids[0]
-  security_group_id           = module.network.internal_security_group_id
-  associate_public_ip_address = false
+  was_subnet_id         = module.network.private_subnet_ids[2] # backend-a
+  was_security_group_id = module.network.internal_api_security_group_id
 
-  key_pair_name    = var.key_pair_name
-  instance_type    = "t3.micro"
-  root_volume_size = 16
+  db_subnet_id         = module.network.private_subnet_ids[4] # db-a
+  db_security_group_id = module.network.internal_mysql_security_group_id
 }

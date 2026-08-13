@@ -43,7 +43,22 @@ output "bastion_security_group_id" {
   value       = module.bastion_sg.id
 }
 
-output "internal_security_group_id" {
-  description = "Internal Security Group ID (SSH + MySQL from within the VPC)"
-  value       = module.internal_sg.id
+output "web_security_group_id" {
+  description = "Web Security Group ID (SSH from bastion, HTTP/HTTPS from within the VPC)"
+  value       = module.web_sg.id
+}
+
+output "internal_mysql_security_group_id" {
+  description = "Internal MySQL Security Group ID (SSH from bastion, MySQL from within the VPC)"
+  value       = module.internal_mysql_sg.id
+}
+
+output "internal_redis_security_group_id" {
+  description = "Internal Redis Security Group ID (SSH from bastion, Redis from within the VPC)"
+  value       = module.internal_redis_sg.id
+}
+
+output "internal_api_security_group_id" {
+  description = "Internal API Security Group ID (SSH from bastion, API from within the VPC)"
+  value       = module.internal_api_sg.id
 }

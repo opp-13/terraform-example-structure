@@ -25,6 +25,7 @@ module "vpc" {
 
 }
 
+
 # Bastion Security Group (public) - SSH from anywhere
 module "bastion_sg" {
   source  = "terraform-aws-modules/security-group/aws"
@@ -55,22 +56,66 @@ module "bastion_sg" {
   }
 }
 
-# Internal Security Group (private) - SSH + MySQL from within the VPC
-module "internal_sg" {
+
+module "web_sg" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "~> 6.0"
 
-  name        = "${var.name_prefix}-internal-sg"
+  name        = "${var.name_prefix}-web-sg"
+  description = "Bastion host - SSH from internet"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = {
+    ssh = {
+      from_port                    = 22
+      to_port                      = 22
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.bastion_sg.id
+      description                  = "SSH from bastion"
+    }
+    http = {
+      from_port   = 80
+      to_port     = 80
+      ip_protocol = "tcp"
+      cidr_ipv4   = var.vpc_cidr
+      description = "Allow all inbound"
+    }
+    https = {
+      from_port   = 443
+      to_port     = 443
+      ip_protocol = "tcp"
+      cidr_ipv4   = var.vpc_cidr
+      description = "Allow all inbound"
+    }
+  }
+
+  egress_rules = {
+    all = {
+      from_port   = 0
+      to_port     = 0
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
+      description = "Allow all outbound"
+    }
+  }
+}
+
+
+module "internal_mysql_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 6.0"
+
+  name        = "${var.name_prefix}-internal-mysql-sg"
   description = "Private resources - SSH and MySQL from within the VPC"
   vpc_id      = module.vpc.vpc_id
 
   ingress_rules = {
     ssh = {
-      from_port   = 22
-      to_port     = 22
-      ip_protocol = "tcp"
-      cidr_ipv4   = var.vpc_cidr
-      description = "SSH from within the VPC"
+      from_port                    = 22
+      to_port                      = 22
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.bastion_sg.id
+      description                  = "SSH from bastion"
     }
     mysql = {
       from_port   = 3306
@@ -78,6 +123,80 @@ module "internal_sg" {
       ip_protocol = "tcp"
       cidr_ipv4   = var.vpc_cidr
       description = "MySQL from within the VPC"
+    }
+  }
+
+  egress_rules = {
+    all = {
+      from_port   = 0
+      to_port     = 0
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
+      description = "Allow all outbound"
+    }
+  }
+}
+
+
+module "internal_redis_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 6.0"
+
+  name        = "${var.name_prefix}-internal-redis-sg"
+  description = "Private resources - SSH and REDIS from within the VPC"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = {
+    ssh = {
+      from_port                    = 22
+      to_port                      = 22
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.bastion_sg.id
+      description                  = "SSH from bastion"
+    }
+    redis = {
+      from_port   = 6379
+      to_port     = 6379
+      ip_protocol = "tcp"
+      cidr_ipv4   = var.vpc_cidr
+      description = "Redis from within the VPC"
+    }
+  }
+
+  egress_rules = {
+    all = {
+      from_port   = 0
+      to_port     = 0
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
+      description = "Allow all outbound"
+    }
+  }
+}
+
+
+module "internal_api_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 6.0"
+
+  name        = "${var.name_prefix}-internal-api-sg"
+  description = "Private resources - SSH and API from within the VPC"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = {
+    ssh = {
+      from_port                    = 22
+      to_port                      = 22
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.bastion_sg.id
+      description                  = "SSH from bastion"
+    }
+    api = {
+      from_port   = 8000
+      to_port     = 8000
+      ip_protocol = "tcp"
+      cidr_ipv4   = var.vpc_cidr
+      description = "API from within the VPC"
     }
   }
 
