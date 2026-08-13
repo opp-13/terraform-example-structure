@@ -18,6 +18,12 @@ variable "environment" {
   type        = string
 }
 
+variable "mangedby" {
+  description = "Resource manager"
+  type        = string
+  default = "terraform"
+}
+
 variable "aws_profile" {
   description = "Named AWS CLI profile to use. Leave null to fall back to the default AWS credential chain."
   type        = string
