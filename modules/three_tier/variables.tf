@@ -24,7 +24,12 @@ variable "alb_security_group_id" {
 }
 
 variable "domain_name" {
-  description = "Domain name to look up an existing ISSUED ACM certificate for (e.g. \"example.com\" or \"*.example.com\")"
+  description = "Domain name to look up an existing ISSUED ACM certificate for. Can be a wildcard (e.g. \"example.com\" or \"*.example.com\") — must match the cert's DomainName exactly."
+  type        = string
+}
+
+variable "base_domain_name" {
+  description = "Apex domain name (never a wildcard, e.g. \"example.com\") used to look up the public Route53 hosted zone and to build the root/www A records."
   type        = string
 }
 

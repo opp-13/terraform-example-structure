@@ -47,4 +47,5 @@ module "three_tier" {
   public_subnet_ids      = module.network.public_subnet_ids
   alb_security_group_id  = module.network.alb_security_group_id
   domain_name            = var.domain_name
+  base_domain_name       = var.base_domain_name
 }

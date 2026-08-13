@@ -117,13 +117,30 @@ module "alb" {
     http = {
       port     = 80
       protocol = "HTTP"
-      forward  = { target_group_key = "web" }
+      redirect = {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
     }
     https = {
       port            = 443
       protocol        = "HTTPS"
       certificate_arn = data.aws_acm_certificate.this.arn
       forward         = { target_group_key = "web" }
+    }
+  }
+
+  route53_records = {
+    root = {
+      zone_id = data.aws_route53_zone.public.zone_id
+      name    = var.base_domain_name
+      type    = "A"
+    }
+    www = {
+      zone_id = data.aws_route53_zone.public.zone_id
+      name    = "www.${var.base_domain_name}"
+      type    = "A"
     }
   }
 }
