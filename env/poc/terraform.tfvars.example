@@ -23,5 +23,6 @@ private_subnets = [
 
 bastion_ssh_cidr    = "REPLACEME"
 
+domain_name = "REPLACEME"
 
 key_pair_name = "REPLACEME"
