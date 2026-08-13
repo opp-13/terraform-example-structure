@@ -42,10 +42,16 @@ module "three_tier" {
   redis_subnet_id         = module.network.private_subnet_ids[2] # backend-a, was_server와 동일 서브넷
   redis_security_group_id = module.network.internal_redis_security_group_id
 
+# alb 이름
   name_prefix            = var.zone
+
   vpc_id                 = module.network.vpc_id
   public_subnet_ids      = module.network.public_subnet_ids
   alb_security_group_id  = module.network.alb_security_group_id
+
+#ACM용 도메인 이름 (ACM에 등록된 인증서의 서브/* 도메인)
   domain_name            = var.domain_name
+
+#route 53에 등록된 루트 도메인
   base_domain_name       = var.base_domain_name
 }
