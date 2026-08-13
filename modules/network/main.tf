@@ -47,8 +47,6 @@ module "bastion_sg" {
 
   egress_rules = {
     all = {
-      from_port   = 0
-      to_port     = 0
       ip_protocol = "-1"
       cidr_ipv4   = "0.0.0.0/0"
       description = "Allow all outbound"
@@ -91,8 +89,6 @@ module "web_sg" {
 
   egress_rules = {
     all = {
-      from_port   = 0
-      to_port     = 0
       ip_protocol = "-1"
       cidr_ipv4   = "0.0.0.0/0"
       description = "Allow all outbound"
@@ -128,8 +124,6 @@ module "internal_mysql_sg" {
 
   egress_rules = {
     all = {
-      from_port   = 0
-      to_port     = 0
       ip_protocol = "-1"
       cidr_ipv4   = "0.0.0.0/0"
       description = "Allow all outbound"
@@ -165,8 +159,6 @@ module "internal_redis_sg" {
 
   egress_rules = {
     all = {
-      from_port   = 0
-      to_port     = 0
       ip_protocol = "-1"
       cidr_ipv4   = "0.0.0.0/0"
       description = "Allow all outbound"
@@ -202,8 +194,6 @@ module "internal_api_sg" {
 
   egress_rules = {
     all = {
-      from_port   = 0
-      to_port     = 0
       ip_protocol = "-1"
       cidr_ipv4   = "0.0.0.0/0"
       description = "Allow all outbound"

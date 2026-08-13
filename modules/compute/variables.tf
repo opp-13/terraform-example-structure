@@ -43,7 +43,7 @@ variable "instance_type" {
 }
 
 variable "root_volume_size" {
-  description = "Root EBS volume size in GB"
+  description = "Root EBS volume size in GB. Must be >= the AMI's root snapshot size (current AL2023 AMI needs >= 30GB)."
   type        = number
-  default     = 16
+  default     = 30
 }
