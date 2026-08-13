@@ -47,3 +47,8 @@ output "redis_server_private_ip" {
   description = "Redis server private IP address"
   value       = module.three_tier.redis_server_private_ip
 }
+
+output "alb_dns_name" {
+  description = "ALB DNS name (point your own domain's DNS record at this)"
+  value       = module.three_tier.alb_dns_name
+}

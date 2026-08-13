@@ -57,3 +57,39 @@ module "redis_server" {
 
   key_pair_name = var.key_pair_name
 }
+
+module "alb" {
+  source  = "terraform-aws-modules/alb/aws"
+  version = "~> 10.0"
+
+  name    = "${var.name_prefix}-alb"
+  vpc_id  = var.vpc_id
+  subnets = var.public_subnet_ids
+
+  create_security_group = false
+  security_groups        = [var.alb_security_group_id]
+
+  target_groups = {
+    web = {
+      name_prefix = "web-"
+      protocol    = "HTTP"
+      port        = 80
+      target_type = "instance"
+      target_id   = module.web_server.instance_id
+    }
+  }
+
+  listeners = {
+    http = {
+      port     = 80
+      protocol = "HTTP"
+      forward  = { target_group_key = "web" }
+    }
+    https = {
+      port            = 443
+      protocol        = "HTTPS"
+      certificate_arn = data.aws_acm_certificate.this.arn
+      forward         = { target_group_key = "web" }
+    }
+  }
+}

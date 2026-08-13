@@ -55,6 +55,41 @@ module "bastion_sg" {
 }
 
 
+module "alb_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 6.0"
+
+  name        = "${var.name_prefix}-alb-sg"
+  description = "Internet-facing ALB - HTTP/HTTPS from anywhere"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = {
+    http = {
+      from_port   = 80
+      to_port     = 80
+      ip_protocol = "tcp"
+      cidr_ipv4   = "0.0.0.0/0"
+      description = "HTTP from anywhere"
+    }
+    https = {
+      from_port   = 443
+      to_port     = 443
+      ip_protocol = "tcp"
+      cidr_ipv4   = "0.0.0.0/0"
+      description = "HTTPS from anywhere"
+    }
+  }
+
+  egress_rules = {
+    all = {
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
+      description = "Allow all outbound"
+    }
+  }
+}
+
+
 module "web_sg" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "~> 6.0"
@@ -72,18 +107,18 @@ module "web_sg" {
       description                  = "SSH from bastion"
     }
     http = {
-      from_port   = 80
-      to_port     = 80
-      ip_protocol = "tcp"
-      cidr_ipv4   = var.vpc_cidr
-      description = "Allow all inbound"
+      from_port                    = 80
+      to_port                      = 80
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.alb_sg.id
+      description                  = "HTTP from ALB"
     }
     https = {
-      from_port   = 443
-      to_port     = 443
-      ip_protocol = "tcp"
-      cidr_ipv4   = var.vpc_cidr
-      description = "Allow all inbound"
+      from_port                    = 443
+      to_port                      = 443
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.alb_sg.id
+      description                  = "HTTPS from ALB"
     }
   }
 
@@ -184,11 +219,11 @@ module "internal_api_sg" {
       description                  = "SSH from bastion"
     }
     api = {
-      from_port   = 8000
-      to_port     = 8000
-      ip_protocol = "tcp"
-      cidr_ipv4   = var.vpc_cidr
-      description = "API from within the VPC"
+      from_port                    = 8000
+      to_port                      = 8000
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.web_sg.id
+      description                  = "API from web server"
     }
   }
 

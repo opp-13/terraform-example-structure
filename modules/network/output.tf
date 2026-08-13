@@ -43,8 +43,13 @@ output "bastion_security_group_id" {
   value       = module.bastion_sg.id
 }
 
+output "alb_security_group_id" {
+  description = "ALB Security Group ID (HTTP/HTTPS from anywhere)"
+  value       = module.alb_sg.id
+}
+
 output "web_security_group_id" {
-  description = "Web Security Group ID (SSH from bastion, HTTP/HTTPS from within the VPC)"
+  description = "Web Security Group ID (SSH from bastion, HTTP/HTTPS from ALB)"
   value       = module.web_sg.id
 }
 
@@ -59,6 +64,6 @@ output "internal_redis_security_group_id" {
 }
 
 output "internal_api_security_group_id" {
-  description = "Internal API Security Group ID (SSH from bastion, API from within the VPC)"
+  description = "Internal API Security Group ID (SSH from bastion, API from web server)"
   value       = module.internal_api_sg.id
 }

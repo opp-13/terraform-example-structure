@@ -3,6 +3,31 @@ variable "key_pair_name" {
   type        = string
 }
 
+variable "name_prefix" {
+  description = "Prefix used for the ALB name (e.g. \"dmz\")"
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "VPC ID the ALB is created in (pass the network module's vpc_id)"
+  type        = string
+}
+
+variable "public_subnet_ids" {
+  description = "Public subnet IDs for the ALB (needs at least 2, across different AZs)"
+  type        = list(string)
+}
+
+variable "alb_security_group_id" {
+  description = "Security group ID for the ALB (pass the network module's alb_security_group_id)"
+  type        = string
+}
+
+variable "domain_name" {
+  description = "Domain name to look up an existing ISSUED ACM certificate for (e.g. \"example.com\" or \"*.example.com\")"
+  type        = string
+}
+
 variable "bastion_subnet_id" {
   description = "Public subnet ID for the bastion instance (pass the network module's public_subnet_ids[n])"
   type        = string

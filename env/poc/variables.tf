@@ -66,3 +66,8 @@ variable "bastion_ssh_cidr" {
   description = "CIDR allowed to SSH into the bastion security group"
   type        = string
 }
+
+variable "domain_name" {
+  description = "Domain name to look up an existing ISSUED ACM certificate for (e.g. \"example.com\" or \"*.example.com\")"
+  type        = string
+}
