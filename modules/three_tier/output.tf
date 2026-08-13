@@ -48,6 +48,11 @@ output "redis_server_private_ip" {
   value       = module.redis_server.private_ip
 }
 
+output "private_dns_zone_id" {
+  description = "Private Route53 hosted zone ID (api/db/redis.cloud.local)"
+  value       = aws_route53_zone.private.zone_id
+}
+
 output "alb_dns_name" {
   description = "ALB DNS name (point your own domain's DNS record at this)"
   value       = module.alb.dns_name

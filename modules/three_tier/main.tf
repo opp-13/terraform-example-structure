@@ -58,6 +58,40 @@ module "redis_server" {
   key_pair_name = var.key_pair_name
 }
 
+# frodo-crud1-front(nginx)/frodo-crud1-api가 기대하는 내부 호스트네임
+# (api.cloud.local, db.cloud.local, redis.cloud.local)을 풀어주는 private hosted zone
+resource "aws_route53_zone" "private" {
+  name = var.private_dns_zone_name
+
+  vpc {
+    vpc_id = var.vpc_id
+  }
+}
+
+resource "aws_route53_record" "api" {
+  zone_id = aws_route53_zone.private.zone_id
+  name    = "api.${var.private_dns_zone_name}"
+  type    = "A"
+  ttl     = 60
+  records = [module.was_server.private_ip]
+}
+
+resource "aws_route53_record" "db" {
+  zone_id = aws_route53_zone.private.zone_id
+  name    = "db.${var.private_dns_zone_name}"
+  type    = "A"
+  ttl     = 60
+  records = [module.db_server.private_ip]
+}
+
+resource "aws_route53_record" "redis" {
+  zone_id = aws_route53_zone.private.zone_id
+  name    = "redis.${var.private_dns_zone_name}"
+  type    = "A"
+  ttl     = 60
+  records = [module.redis_server.private_ip]
+}
+
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 10.0"

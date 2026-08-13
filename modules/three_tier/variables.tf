@@ -28,6 +28,12 @@ variable "domain_name" {
   type        = string
 }
 
+variable "private_dns_zone_name" {
+  description = "Private Route53 hosted zone name for internal service discovery. Must match the app's expected hostnames (api/db/redis.<this>), e.g. \"cloud.local\"."
+  type        = string
+  default     = "cloud.local"
+}
+
 variable "bastion_subnet_id" {
   description = "Public subnet ID for the bastion instance (pass the network module's public_subnet_ids[n])"
   type        = string
