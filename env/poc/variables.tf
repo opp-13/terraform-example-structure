@@ -78,9 +78,12 @@ variable "public_subnet_cidrs" {
   type        = list(string)
 }
 
-variable "private_subnet_cidrs" {
-  description = "CIDR blocks for private subnets, one per AZ"
-  type        = list(string)
+variable "private_subnets" {
+  description = "Private subnets to create, each with its own name and CIDR"
+  type = list(object({
+    name = string
+    cidr = string
+  }))
 }
 
 variable "bastion_ssh_cidr" {

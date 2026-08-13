@@ -6,8 +6,14 @@ module "vpc" {
   cidr = var.vpc_cidr
   azs  = var.azs
 
-  public_subnets  = var.public_subnet_cidrs
-  private_subnets = var.private_subnet_cidrs
+  public_subnets = var.public_subnet_cidrs
+
+    public_subnet_names = [
+    for i, cidr in var.public_subnet_cidrs : "${var.name_prefix}-public-${substr(element(var.azs, i), -1, 1)}"
+    ]
+
+  private_subnets      = [for s in var.private_subnets : s.cidr]
+  private_subnet_names = [for s in var.private_subnets : "${var.name_prefix}-${s.name}"]
 
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -17,8 +23,6 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = true
 
-  public_subnet_tags  = { Name = "${var.name_prefix}-public" }
-  private_subnet_tags = { Name = "${var.name_prefix}-private" }
 }
 
 # Bastion Security Group (public) - SSH from anywhere

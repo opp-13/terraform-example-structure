@@ -10,12 +10,12 @@ provider "aws" {
 module "network" {
   source = "../../modules/network"
 
-  name_prefix          = var.zone
-  vpc_cidr             = var.vpc_cidr
-  azs                  = var.azs
-  public_subnet_cidrs  = var.public_subnet_cidrs
-  private_subnet_cidrs = var.private_subnet_cidrs
-  bastion_ssh_cidr     = var.bastion_ssh_cidr
+  name_prefix         = var.zone
+  vpc_cidr            = var.vpc_cidr
+  azs                 = var.azs
+  public_subnet_cidrs = var.public_subnet_cidrs
+  private_subnets     = var.private_subnets
+  bastion_ssh_cidr    = var.bastion_ssh_cidr
 }
 
 # Instance
