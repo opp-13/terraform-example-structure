@@ -92,6 +92,14 @@ resource "aws_route53_record" "redis" {
   records = [module.redis_server.private_ip]
 }
 
+# ALB 삭제 API 호출이 끝나도 AWS가 ENI를 비동기로 정리하는 데 시간이 걸려서,
+# 그 직후 바로 IGW/서브넷을 지우려 하면 "ENI가 아직 붙어있다"며 막히는 경우가 있음.
+# module.alb가 이 리소스에 의존하게 해서, destroy 시 ALB가 먼저 지워지고
+# 이 리소스가 destroy_duration만큼 대기한 뒤에야 나머지(네트워크 쪽)가 지워지도록 함.
+resource "time_sleep" "wait_for_alb_eni_cleanup" {
+  destroy_duration = "2m"
+}
+
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 10.0"
@@ -102,6 +110,8 @@ module "alb" {
 
   create_security_group = false
   security_groups        = [var.alb_security_group_id]
+
+  depends_on = [time_sleep.wait_for_alb_eni_cleanup]
 
   target_groups = {
     web = {
