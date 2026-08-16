@@ -1,7 +1,7 @@
 variable "bucket_name" {
   description = "Name of the S3 bucket that will hold Terraform remote state for this project"
   type        = string
-  default     = "terraform-state-example"
+  default     = "terraform-state-example-s6john"
 }
 
 variable "aws_profile" {
