@@ -1,6 +1,11 @@
 version: 0.2
 
 env:
+  variables:
+    # CodeBuild runs commands as root, but the actions/runner software refuses to
+    # config.sh/run.sh under root by default ("Must not run with sudo") - this is the
+    # officially supported override for exactly that case.
+    RUNNER_ALLOW_RUNASROOT: "1"
   secrets-manager:
     GH_TOKEN: "gha-runner/github-token:token"
 
@@ -10,6 +15,11 @@ phases:
       - curl -sL -o /tmp/runner.tar.gz "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
       - mkdir -p /runner && tar xzf /tmp/runner.tar.gz -C /runner
       - /runner/bin/installdependencies.sh
+
+      - wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+      - sudo apt update && sudo apt install terraform
+
       - terraform -version
       - aws --version
 

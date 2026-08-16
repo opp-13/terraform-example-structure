@@ -33,6 +33,11 @@ resource "aws_codebuild_project" "gha_runner" {
       value = var.runner_version
     }
 
+    environment_variable {
+      name  = "TERRAFORM_VERSION"
+      value = var.terraform_version
+    }
+
     # Default label set for a manually-started build (e.g. testing); the webhook Lambda
     # overrides this per-invocation with the queued job's actual labels.
     environment_variable {

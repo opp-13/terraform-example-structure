@@ -38,6 +38,12 @@ variable "runner_version" {
   default     = "2.321.0"
 }
 
+variable "terraform_version" {
+  description = "Terraform release version to install in the buildspec - the CodeBuild base image doesn't ship one"
+  type        = string
+  default     = "1.13.4"
+}
+
 variable "compute_type" {
   description = "CodeBuild compute size for the runner project"
   type        = string
