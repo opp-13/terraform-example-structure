@@ -9,8 +9,8 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "terraform-state-sesac"
-    key          = "dmz/poc/terraform.tfstate"
+    bucket       = "terraform-state-example-s6john"
+    key          = "env/poc/terraform.tfstate"
     region       = "ap-northeast-2"
     encrypt      = true
     use_lockfile = true
