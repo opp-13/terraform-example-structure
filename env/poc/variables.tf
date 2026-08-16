@@ -29,6 +29,18 @@ variable "aws_profile" {
   type        = string
 }
 
+variable "oidc_role_arn" {
+  description = "IAM role ARN to assume via GitHub OIDC web-identity federation for this environment's actual resource deployment (CI only, from init/oidc's apply_role_arn/plan_role_arn output). Leave null for local applies, which use var.aws_profile instead."
+  type        = string
+  default     = null
+}
+
+variable "web_identity_token_file" {
+  description = "Path to a file containing the GitHub Actions OIDC ID token (CI only, paired with var.oidc_role_arn). Leave null for local applies."
+  type        = string
+  default     = null
+}
+
 variable "region" {
   description = "AWS region"
   type        = string

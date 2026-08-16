@@ -1,6 +1,17 @@
 provider "aws" {
-  region  = var.region
-  profile = var.aws_profile
+  region = var.region
+  # Local human applies use aws_profile; CI jobs instead set oidc_role_arn (and leave
+  # aws_profile unset), assuming an init/oidc role via the GitHub Actions OIDC token -
+  # never both at once.
+  profile = var.oidc_role_arn == null ? var.aws_profile : null
+
+  dynamic "assume_role_with_web_identity" {
+    for_each = var.oidc_role_arn == null ? [] : [1]
+    content {
+      role_arn                = var.oidc_role_arn
+      web_identity_token_file = var.web_identity_token_file
+    }
+  }
 
   default_tags {
     tags = local.common_tags

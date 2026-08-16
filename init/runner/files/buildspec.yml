@@ -1,0 +1,48 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    GH_TOKEN: "gha-runner/github-token:token"
+
+phases:
+  install:
+    commands:
+      - curl -sL -o /tmp/runner.tar.gz "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+      - mkdir -p /runner && tar xzf /tmp/runner.tar.gz -C /runner
+      - /runner/bin/installdependencies.sh
+      - terraform -version
+      - aws --version
+
+  pre_build:
+    commands:
+      - |
+        REG_TOKEN=$(curl -sf -X POST \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions/runners/registration-token" \
+          | jq -r .token)
+      - RUNNER_NAME="codebuild-${CODEBUILD_BUILD_ID##*:}"
+      - |
+        /runner/config.sh \
+          --url "https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}" \
+          --token "${REG_TOKEN}" \
+          --name "${RUNNER_NAME}" \
+          --labels "${RUNNER_LABELS}" \
+          --ephemeral --unattended --replace
+
+  build:
+    commands:
+      - (cd /runner && ./run.sh) || RUN_EXIT=$?
+      - exit ${RUN_EXIT:-0}
+
+  post_build:
+    commands:
+      # --ephemeral makes run.sh deregister itself on normal completion. This is only a
+      # safety net for the case where run.sh crashed/was killed (e.g. build_timeout) and
+      # left a stale registration behind - the reaper Lambda is the second safety net for
+      # anything this step also fails to clean up.
+      - |
+        if [ -f /runner/.runner ]; then
+          echo "stale registration detected, removing"
+          /runner/config.sh remove --token "${REG_TOKEN}" || true
+        fi
