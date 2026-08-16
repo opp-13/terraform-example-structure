@@ -35,7 +35,7 @@ variable "runner_label" {
 variable "runner_version" {
   description = "actions/runner release version to install in the buildspec"
   type        = string
-  default     = "2.321.0"
+  default     = "2.336.0"
 }
 
 variable "terraform_version" {

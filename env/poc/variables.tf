@@ -21,7 +21,7 @@ variable "environment" {
 variable "mangedby" {
   description = "Resource manager"
   type        = string
-  default = "terraform"
+  default     = "terraform"
 }
 
 variable "aws_profile" {
