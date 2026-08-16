@@ -107,7 +107,7 @@ jobs:
         run: |
           set +e
           terraform -chdir=env/${{ matrix.env }} plan -no-color -input=false -out=tfplan -detailed-exitcode \
-            -var="oidc_role_arn=arn:aws:iam::${{ fromJSON(vars.ENV_ACCOUNT_IDS)[matrix.env] }}:role/gha-${{ matrix.env }}-plan" \
+            -var="oidc_role_arn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gha-${{ matrix.env }}-plan" \
             -var="web_identity_token_file=${{ steps.oidc.outputs.token_file }}"
           code=$?
           echo "exitcode=$code" >> "$GITHUB_OUTPUT"
