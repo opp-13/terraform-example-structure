@@ -20,9 +20,12 @@ resource "aws_lambda_function" "webhook" {
 
   environment {
     variables = {
-      WEBHOOK_SECRET_ARN     = aws_secretsmanager_secret.webhook_hmac.arn
-      CODEBUILD_PROJECT_NAME = aws_codebuild_project.gha_runner.name
-      RUNNER_LABEL           = var.runner_label
+      WEBHOOK_SECRET_ARN      = aws_secretsmanager_secret.webhook_hmac.arn
+      CODEBUILD_PROJECT_NAME  = aws_codebuild_project.gha_runner.name
+      RUNNER_LABEL            = var.runner_label
+      GITHUB_TOKEN_SECRET_ARN = aws_secretsmanager_secret.gha_token.arn
+      GITHUB_REPO_OWNER       = var.github_org
+      GITHUB_REPO_NAME        = var.github_repo
     }
   }
 

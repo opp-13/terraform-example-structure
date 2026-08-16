@@ -34,6 +34,16 @@ data "aws_iam_policy_document" "webhook_lambda" {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [aws_secretsmanager_secret.webhook_hmac.arn]
   }
+
+  # Needed to re-check a job's live status against the GitHub API right before
+  # StartBuild - see webhook/index.py. Without this, a duplicate `queued` webhook
+  # delivery for a job another build already claimed spins up a second CodeBuild
+  # runner that just sits idle until build_timeout.
+  statement {
+    sid       = "ReadGithubCredential"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.gha_token.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "webhook_lambda" {
