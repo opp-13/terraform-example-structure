@@ -46,11 +46,6 @@ variable "region" {
   type        = string
 }
 
-variable "key_pair_name" {
-  description = "Name of an existing EC2 key pair (created in the AWS console) to use for SSH access to the bastion"
-  type        = string
-}
-
 variable "vpc_cidr" {
   description = "VPC CIDR block"
   type        = string
@@ -79,12 +74,3 @@ variable "bastion_ssh_cidr" {
   type        = string
 }
 
-variable "domain_name" {
-  description = "Domain name to look up an existing ISSUED ACM certificate for. Can be a wildcard (e.g. \"example.com\" or \"*.example.com\") — must match the cert's DomainName exactly."
-  type        = string
-}
-
-variable "base_domain_name" {
-  description = "Apex domain name (never a wildcard, e.g. \"example.com\") used to look up the public Route53 hosted zone and to build the root/www A records."
-  type        = string
-}
