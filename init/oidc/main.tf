@@ -6,14 +6,18 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-# Trust policies are scoped by the OIDC token's `job_workflow_ref` claim (which workflow
-# *file* produced this token), NOT `sub`. plan/apply jobs both declare `environment: <env>`
-# (a plain config container - see init/oidc/README.md) purely to read tfvars
-# Variables/Secrets, and GitHub always shapes `sub` as `repo:...:environment:<name>`
-# whenever a job declares ANY environment, regardless of what it's named or what event
-# triggered it - so `sub` can't distinguish "PR-time plan" from "post-merge apply" here.
-# `job_workflow_ref` is unaffected by that and reflects which of the two workflow files
-# actually ran, which is exactly the distinction that matters for scoping the apply role.
+# Trust policies are scoped by `sub`, matching this repo's actual live OIDC token shape -
+# confirmed by decoding a real token rather than assuming the classic
+# `repo:org/repo:environment:name` format. This repo uses GitHub's newer "immutable
+# subject claims", so `sub` looks like `repo:org@<owner_id>/repo@<repo_id>:environment:name`
+# - the `@<id>` segments are stable per-repo but not something to hardcode, hence the
+# wildcards. (A `job_workflow_ref`-based condition was tried first to distinguish PR-time
+# plan from post-merge apply without relying on GitHub Environment names, but AssumeRole
+# kept failing even though the decoded token's job_workflow_ref matched the policy
+# byte-for-byte - unclear why, not worth blocking on further. Both plan and apply jobs
+# declare `environment: <env>` for tfvars access, so both trust policies end up identical;
+# the workflow YAML hardcoding which role ARN each job requests is the only thing keeping
+# plan from ever requesting apply-level credentials now - see init/oidc/README.md.)
 data "aws_iam_policy_document" "plan_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -31,8 +35,8 @@ data "aws_iam_policy_document" "plan_trust" {
 
     condition {
       test     = "StringLike"
-      variable = "token.actions.githubusercontent.com:job_workflow_ref"
-      values   = ["${var.github_org}/${var.github_repo}/.github/workflows/terraform-pr.yml@*"]
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_org}@*/${var.github_repo}@*:environment:${var.environment}"]
     }
   }
 }
@@ -54,8 +58,8 @@ data "aws_iam_policy_document" "apply_trust" {
 
     condition {
       test     = "StringLike"
-      variable = "token.actions.githubusercontent.com:job_workflow_ref"
-      values   = ["${var.github_org}/${var.github_repo}/.github/workflows/terraform-apply.yml@*"]
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_org}@*/${var.github_repo}@*:environment:${var.environment}"]
     }
   }
 }
