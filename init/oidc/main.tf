@@ -6,11 +6,14 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-# Trust policies are scoped by GitHub OIDC token `sub` claim shape, NOT by a per-env
-# GitHub Environment. plan/apply jobs declare a plain `<env>` config environment (for
-# tfvars values) but that carries no protection rules and isn't a security boundary - the
-# real boundaries are (a) the AWS account itself, and (b) the pull_request/ref shape below,
-# which is enough to stop a PR-time plan job from ever presenting apply-shaped credentials.
+# Trust policies are scoped by the OIDC token's `job_workflow_ref` claim (which workflow
+# *file* produced this token), NOT `sub`. plan/apply jobs both declare `environment: <env>`
+# (a plain config container - see init/oidc/README.md) purely to read tfvars
+# Variables/Secrets, and GitHub always shapes `sub` as `repo:...:environment:<name>`
+# whenever a job declares ANY environment, regardless of what it's named or what event
+# triggered it - so `sub` can't distinguish "PR-time plan" from "post-merge apply" here.
+# `job_workflow_ref` is unaffected by that and reflects which of the two workflow files
+# actually ran, which is exactly the distinction that matters for scoping the apply role.
 data "aws_iam_policy_document" "plan_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -26,11 +29,10 @@ data "aws_iam_policy_document" "plan_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # sub claim for a pull_request-triggered job.
     condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:pull_request"]
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:job_workflow_ref"
+      values   = ["${var.github_org}/${var.github_repo}/.github/workflows/terraform-pr.yml@*"]
     }
   }
 }
@@ -50,11 +52,10 @@ data "aws_iam_policy_document" "apply_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # sub claim for a push-to-main-triggered job.
     condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main"]
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:job_workflow_ref"
+      values   = ["${var.github_org}/${var.github_repo}/.github/workflows/terraform-apply.yml@*"]
     }
   }
 }
