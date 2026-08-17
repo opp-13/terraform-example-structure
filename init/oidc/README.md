@@ -10,7 +10,7 @@
 
 이 두 role은 **배포 대상 리소스(EC2/ALB/Route53 등) 권한만** 가지고 있고, Terraform state(S3) 접근 권한은 없습니다. state 버킷은 `init/runner`의 CodeBuild role(중앙 계정, 같은 계정이라 별도 cross-account 설정 불필요)이 담당합니다 — 그래서 워크플로우 job 안에서 이 role은 `provider "aws" { assume_role_with_web_identity {...} }`로만 assume되고, `terraform init`(backend)에는 관여하지 않습니다.
 
-두 role의 신뢰 정책은 GitHub OIDC 토큰의 `sub` claim을 **GitHub Environment 이름**까지 스코핑합니다(`repo:<org>/<repo>:environment:<environment>-plan` / `...-apply`). 그래서 plan 게이트만 통과한 job이 apply role을 assume할 수 없습니다.
+두 role의 신뢰 정책은 GitHub OIDC 토큰의 `sub` claim을 **`pull_request`(plan) / `ref:refs/heads/main`(apply)** 로 스코핑합니다 — GitHub Environment 이름이 아닙니다. `plan`/`apply` job은 `environment: <env>`(순수 설정 저장용, protection rule 없음)를 선언하지만 이건 tfvars 값을 담아두는 컨테이너일 뿐이고, 실제 신뢰 경계는 이 claim 모양(PR에서 도는 job인지, main push apply job인지)과 AWS 계정 자체입니다. 그래서 환경 하나 늘어도 `<env>-plan`/`<env>-apply` 같은 별도 Environment를 안 만들어도 됩니다.
 
 ## 왜 backend key가 versions.tf에 없는가
 
@@ -33,18 +33,21 @@ terraform apply \
   -var="github_repo=<repo-name>"
 ```
 
-apply 후 나온 두 role ARN(`plan_role_arn`, `apply_role_arn`)에서 계정 ID만 뽑아서 아래 GitHub Environment secret에 등록하세요 (`init/bootstrap`은 건드릴 필요 없습니다 - state 버킷 접근은 `init/runner`가 전담).
+apply 후 나온 두 role ARN(`plan_role_arn`, `apply_role_arn`)에서 계정 ID만 뽑아서 아래 GitHub Environment secret에 등록하세요.
 
 ## GitHub 쪽 수동 설정
 
-repo **Settings → Environments**에 다음을 생성하세요 (환경마다):
-- `<environment>-plan` — required reviewers 없음 (PR plan job이 사용). **Environment secret** `AWS_ACCOUNT_ID` = 이 환경의 AWS 계정 ID 등록.
-- `<environment>-apply-approval` — required reviewers 설정 (최종 승인 게이트)
-- `<environment>-apply` — required reviewers 없음, "Deployment branches: main only"만 설정 (merge 후 apply job이 사용). **Environment secret** `AWS_ACCOUNT_ID` = 이 환경의 AWS 계정 ID 등록 (`-plan`과 값 동일, 같은 계정).
+repo **Settings → Environments**에 다음을 생성하세요:
 
-그리고 전역 `test-approval` 환경 하나(required reviewers 설정)를 별도로 만들어야 합니다.
+- **`test-approval`** (전역, 환경 무관 하나만) — Required reviewers 설정. PR의 첫 승인 게이트.
+- **`<env>`** (환경마다, 예: `poc`) — protection rule 없음, 순수 설정 저장용. `plan`/`apply` job이 여기서 tfvars 값을 읽습니다:
+  - **Variables**: `PROJECT`, `OWNER`, `ZONE`, `ENVIRONMENT`, `REGION`, `VPC_CIDR`, `AZS`(예: `["ap-northeast-2a","ap-northeast-2c"]`), `PUBLIC_SUBNET_CIDRS`, `PRIVATE_SUBNETS`(JSON, 예: `[{"name":"frontend-a","cidr":"10.0.2.0/24"}, ...]`) — 민감하지 않은 값
+  - **Secrets**: `BASTION_SSH_CIDR`, `AWS_ACCOUNT_ID`(이 환경의 계정 ID) — 로그에서 가려야 하는 값. **반드시 Secret으로 등록하세요, Variable로 등록하면 Actions 로그(명령어 echo 등)에 그대로 노출됩니다** (Variable은 마스킹 대상이 아님).
+- **`<env>-apply-approval`** (환경마다) — Required reviewers 설정. 최종 승인 게이트.
 
-**계정 ID를 repo variable(`ENV_ACCOUNT_IDS` 같은 JSON 통짜 값)로 등록하지 마세요.** repo가 public일 경우, GitHub의 로그 마스킹은 시크릿에 **등록된 값 그대로**가 로그에 나올 때만 가려주는데, `fromJSON(...)[matrix.env]`로 JSON에서 뽑아낸 부분 문자열은 원래 등록된 전체 문자열과 다르기 때문에 마스킹이 안 됩니다. 그래서 각 Environment에 **같은 이름(`AWS_ACCOUNT_ID`), 환경마다 다른 값**으로 등록하는 방식을 씁니다 — job이 `environment: <env>-plan`을 선언하는 순간 그 환경에 등록된 값만 노출되고, GitHub가 job 실행 전에 어떤 시크릿이 쓰이는지 미리 알기 때문에 로그에서도 제대로 마스킹됩니다.
+`<env>-plan`/`<env>-apply`처럼 role 종류별로 나눈 Environment는 필요 없습니다 — OIDC 신뢰 조건이 이제 GitHub Environment 이름이 아니라 `pull_request`/`ref:refs/heads/main` claim으로 스코핑되기 때문입니다.
+
+`bastion_ssh_cidr`/`AWS_ACCOUNT_ID`가 Secret이어도, PR 코멘트로 올라가는 plan 결과 자체는 `.github/workflows/terraform-pr.yml`이 파일을 읽어서 API로 직접 올리는 거라 GitHub의 자동 마스킹을 안 탑니다 — 그래서 워크플로우 안에 이 두 값을 명시적으로 치환(redact)하는 코드가 따로 있습니다. 값을 더 가리고 싶으면 그 redaction 배열에 추가하세요.
 
 ## 자동 생성 문서
 

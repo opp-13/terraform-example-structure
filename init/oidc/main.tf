@@ -6,9 +6,11 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-# Trust policies are scoped down to the GitHub *Environment* name (via the OIDC token's
-# `sub` claim), not just the repo - so a job that only cleared the plan-gate can't assume
-# the apply role, even though both roles trust the same repo.
+# Trust policies are scoped by GitHub OIDC token `sub` claim shape, NOT by a per-env
+# GitHub Environment. plan/apply jobs declare a plain `<env>` config environment (for
+# tfvars values) but that carries no protection rules and isn't a security boundary - the
+# real boundaries are (a) the AWS account itself, and (b) the pull_request/ref shape below,
+# which is enough to stop a PR-time plan job from ever presenting apply-shaped credentials.
 data "aws_iam_policy_document" "plan_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -24,10 +26,11 @@ data "aws_iam_policy_document" "plan_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # sub claim for a pull_request-triggered job.
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:environment:${var.environment}-plan"]
+      values   = ["repo:${var.github_org}/${var.github_repo}:pull_request"]
     }
   }
 }
@@ -47,10 +50,11 @@ data "aws_iam_policy_document" "apply_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # sub claim for a push-to-main-triggered job.
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:environment:${var.environment}-apply"]
+      values   = ["repo:${var.github_org}/${var.github_repo}:ref:refs/heads/main"]
     }
   }
 }
