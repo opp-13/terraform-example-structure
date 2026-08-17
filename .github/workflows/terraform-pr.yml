@@ -121,6 +121,12 @@ jobs:
             fs.writeFileSync(tokenFile, token);
             core.setOutput('token_file', tokenFile);
 
+            // TEMPORARY debug - remove once the trust policy match is confirmed working.
+            // Only prints GitHub-side claims (repo/ref/job_workflow_ref/etc.), nothing
+            // secret, so it's safe to leave visible in the log for now.
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+            core.info(`OIDC claims: ${JSON.stringify(payload, null, 2)}`);
+
       - id: plan
         run: |
           set +e
