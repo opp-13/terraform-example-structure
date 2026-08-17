@@ -20,6 +20,14 @@ resource "aws_apigatewayv2_stage" "webhook" {
   api_id      = aws_apigatewayv2_api.webhook.id
   name        = "$default"
   auto_deploy = true
+
+  # Cost/DoS guardrail in front of the Lambda's own HMAC check - GitHub's real webhook
+  # traffic for this repo is a handful of requests per minute at most, so this only
+  # bites during an actual flood.
+  default_route_settings {
+    throttling_burst_limit = var.webhook_throttle_burst_limit
+    throttling_rate_limit  = var.webhook_throttle_rate_limit
+  }
 }
 
 resource "aws_lambda_permission" "apigateway" {

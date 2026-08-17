@@ -68,6 +68,18 @@ variable "max_concurrent_runners" {
   default     = 5
 }
 
+variable "webhook_throttle_burst_limit" {
+  description = "API Gateway burst limit (concurrent requests) for the webhook route - cost/DoS guardrail"
+  type        = number
+  default     = 10
+}
+
+variable "webhook_throttle_rate_limit" {
+  description = "API Gateway steady-state requests/second for the webhook route - cost/DoS guardrail"
+  type        = number
+  default     = 5
+}
+
 variable "reaper_schedule_expression" {
   description = "EventBridge schedule expression for the orphaned-runner-registration cleanup Lambda"
   type        = string
