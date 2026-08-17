@@ -27,6 +27,7 @@ variable "mangedby" {
 variable "aws_profile" {
   description = "Named AWS CLI profile to use. Leave null to fall back to the default AWS credential chain."
   type        = string
+  default     = null
 }
 
 variable "oidc_role_arn" {
