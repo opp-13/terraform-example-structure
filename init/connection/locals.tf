@@ -4,6 +4,5 @@ locals {
     Zone        = var.zone
     Project     = var.project
     Environment = var.environment
-    ManagedBy   = var.mangedby
   }
 }

@@ -1,0 +1,92 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "env/**"
+
+permissions:
+  contents: read
+
+jobs:
+  detect-envs:
+    runs-on: [self-hosted, codebuild-ephemeral]
+    outputs:
+      envs: ${{ steps.diff.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        run: |
+          ENVS=$(git diff --name-only "${{ github.event.before }}" "${{ github.event.after }}" -- env \
+                 | awk -F/ '{print $2}' | sort -u)
+          JSON=$(printf '%s\n' "$ENVS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "envs=$JSON" >> "$GITHUB_OUTPUT"
+
+  # Approval already happened pre-merge (terraform-pr.yml's final-approval gate).
+  # `environment: ${{ matrix.env }}` here is the same plain config container the plan job
+  # uses (Environment variables/secrets for this env's tfvars) - not a protection rule.
+  apply:
+    needs: detect-envs
+    if: needs.detect-envs.outputs.envs != '[]'
+    strategy:
+      matrix:
+        env: ${{ fromJSON(needs.detect-envs.outputs.envs) }}
+      fail-fast: false
+    runs-on: [self-hosted, codebuild-ephemeral]
+    environment: ${{ matrix.env }}
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: tf-apply-${{ matrix.env }}
+      cancel-in-progress: false
+    # See terraform-pr.yml's plan job for why this is TF_VAR_* env vars instead of -var=
+    # flags - same fixed set for every env, unused ones are just ignored by Terraform.
+    env:
+      TF_VAR_project: ${{ vars.PROJECT }}
+      TF_VAR_owner: ${{ vars.OWNER }}
+      TF_VAR_zone: ${{ vars.ZONE }}
+      TF_VAR_environment: ${{ vars.ENVIRONMENT }}
+      TF_VAR_region: ${{ vars.REGION }}
+      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
+      TF_VAR_azs: ${{ vars.AZS }}
+      TF_VAR_public_subnet_cidrs: ${{ vars.PUBLIC_SUBNET_CIDRS }}
+      TF_VAR_private_subnets: ${{ vars.PRIVATE_SUBNETS }}
+      TF_VAR_bastion_ssh_cidr: ${{ secrets.BASTION_SSH_CIDR }}
+      TF_VAR_oidc_role_arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gha-${{ matrix.env }}-apply
+    steps:
+      - uses: actions/checkout@v4
+
+      # Backend (S3 state) access rides on this shared runner's own ambient CodeBuild
+      # role (central account, same as the bucket) - no OIDC assume-role needed here.
+      - run: terraform -chdir=env/${{ matrix.env }} init
+
+      # Only the "aws" provider (actual resource writes in the target account) goes
+      # through the per-environment OIDC apply role, via Terraform's own
+      # assume_role_with_web_identity - see terraform-pr.yml's plan job for why this isn't
+      # aws-actions/configure-aws-credentials.
+      - name: Get GitHub OIDC token for AWS
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const tokenFile = `${process.env.RUNNER_TEMP}/gh_oidc_token`;
+            fs.writeFileSync(tokenFile, token);
+            core.setOutput('token_file', tokenFile);
+
+      # Re-plan immediately before apply rather than reusing any earlier plan artifact.
+      # This is what makes concurrent-approval handling correct: applies to the same
+      # environment are serialized by the concurrency group above, so a "later" run that
+      # was queued behind an earlier one re-checks current state right before applying it,
+      # instead of blindly applying a plan computed against now-stale state.
+      - run: |
+          terraform -chdir=env/${{ matrix.env }} plan -no-color -input=false -out=tfplan \
+            -var="web_identity_token_file=${{ steps.oidc.outputs.token_file }}"
+      - run: terraform -chdir=env/${{ matrix.env }} show -no-color tfplan
+      - run: terraform -chdir=env/${{ matrix.env }} apply -input=false -auto-approve tfplan

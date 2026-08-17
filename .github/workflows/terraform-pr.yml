@@ -1,0 +1,254 @@
+name: Terraform PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - "env/**"
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate #1 - native GitHub Environment "required reviewers". Runs before we even know
+  # which env/<name> dirs changed, per the required flow order (test approval -> lint).
+  test-approval:
+    runs-on: [self-hosted, codebuild-ephemeral]
+    environment: test-approval
+    steps:
+      - run: echo "Test approval passed"
+
+  detect-envs:
+    needs: test-approval
+    runs-on: [self-hosted, codebuild-ephemeral]
+    outputs:
+      envs: ${{ steps.diff.outputs.envs }}
+      any: ${{ steps.diff.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - id: diff
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          ENVS=$(git diff --name-only "$BASE" "$HEAD" -- env | awk -F/ '{print $2}' | sort -u)
+          JSON=$(printf '%s\n' "$ENVS" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "envs=$JSON" >> "$GITHUB_OUTPUT"
+          if [ "$JSON" != "[]" ]; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  lint:
+    needs: detect-envs
+    if: needs.detect-envs.outputs.any == 'true'
+    strategy:
+      matrix:
+        env: ${{ fromJSON(needs.detect-envs.outputs.envs) }}
+    runs-on: [self-hosted, codebuild-ephemeral]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - run: terraform -chdir=env/${{ matrix.env }} fmt -check -recursive
+      - run: terraform -chdir=env/${{ matrix.env }} init -backend=false
+      - run: terraform -chdir=env/${{ matrix.env }} validate
+
+  # No approval gate here - `environment: ${{ matrix.env }}` is a plain config container
+  # (Environment variables/secrets for this env's tfvars), not a protection rule. The real
+  # gates are test-approval (above) and final-approval (below); OIDC role scoping comes
+  # from the pull_request/ref claim shape in init/oidc, not from this environment name.
+  plan:
+    needs: [lint, detect-envs]
+    strategy:
+      matrix:
+        env: ${{ fromJSON(needs.detect-envs.outputs.envs) }}
+    runs-on: [self-hosted, codebuild-ephemeral]
+    environment: ${{ matrix.env }}
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: tf-plan-${{ matrix.env }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    # TF_VAR_* is Terraform's own auto-load convention - no -var= flags needed below.
+    # This same fixed set is used for every env's job regardless of matrix.env; a
+    # variable a given env's root module doesn't declare is just ignored by Terraform,
+    # so different envs needing different variable sets doesn't require touching this
+    # workflow - only the env's own variables.tf and its GitHub Environment config.
+    env:
+      TF_VAR_project: ${{ vars.PROJECT }}
+      TF_VAR_owner: ${{ vars.OWNER }}
+      TF_VAR_zone: ${{ vars.ZONE }}
+      TF_VAR_environment: ${{ vars.ENVIRONMENT }}
+      TF_VAR_region: ${{ vars.REGION }}
+      TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
+      TF_VAR_azs: ${{ vars.AZS }}
+      TF_VAR_public_subnet_cidrs: ${{ vars.PUBLIC_SUBNET_CIDRS }}
+      TF_VAR_private_subnets: ${{ vars.PRIVATE_SUBNETS }}
+      TF_VAR_bastion_ssh_cidr: ${{ secrets.BASTION_SSH_CIDR }}
+      TF_VAR_oidc_role_arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gha-${{ matrix.env }}-plan
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Backend (S3 state) access rides on this shared runner's own ambient CodeBuild
+      # role - it lives in the same central account as the bucket, so no OIDC assume-role
+      # is needed just to init/read/write state. See init/runner/README.md.
+      - run: terraform -chdir=env/${{ matrix.env }} init
+
+      # Only the "aws" provider (actual resource reads/writes in the target account) goes
+      # through the per-environment OIDC role, via Terraform's own
+      # assume_role_with_web_identity - not aws-actions/configure-aws-credentials, since
+      # that would set ambient credentials for the whole job (including the backend init
+      # above) rather than scoping OIDC just to the provider.
+      - name: Get GitHub OIDC token for AWS
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const tokenFile = `${process.env.RUNNER_TEMP}/gh_oidc_token`;
+            fs.writeFileSync(tokenFile, token);
+            core.setOutput('token_file', tokenFile);
+
+            // TEMPORARY debug - remove once the trust policy match is confirmed working.
+            // Only prints GitHub-side claims (repo/ref/job_workflow_ref/etc.), nothing
+            // secret, so it's safe to leave visible in the log for now.
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+            core.info(`OIDC claims: ${JSON.stringify(payload, null, 2)}`);
+
+      - id: plan
+        run: |
+          set +e
+          terraform -chdir=env/${{ matrix.env }} plan -no-color -input=false -out=tfplan -detailed-exitcode \
+            -var="web_identity_token_file=${{ steps.oidc.outputs.token_file }}"
+          code=$?
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Render plan output
+        if: steps.plan.outputs.exitcode != '1'
+        run: terraform -chdir=env/${{ matrix.env }} show -no-color tfplan > env/${{ matrix.env }}/plan.txt
+
+      - name: Comment plan on PR
+        if: steps.plan.outputs.exitcode != '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const env = "${{ matrix.env }}";
+            const exitcode = "${{ steps.plan.outputs.exitcode }}";
+            const status = exitcode === "0" ? "변경 없음" : "변경 있음";
+            let raw = fs.readFileSync(`env/${env}/plan.txt`, 'utf8');
+
+            // These bypass GitHub's native log masking entirely, since we read the file
+            // and post it via the API ourselves rather than printing it to the job's log
+            // stream - so they need to be scrubbed by hand. Add more [value, label] pairs
+            // here as more sensitive values get passed into terraform.
+            const redactions = [
+              ["${{ secrets.BASTION_SSH_CIDR }}", "bastion_ssh_cidr"],
+              ["${{ secrets.AWS_ACCOUNT_ID }}", "aws_account_id"],
+            ];
+            for (const [value, label] of redactions) {
+              if (value) raw = raw.split(value).join(`***${label}***`);
+            }
+
+            const MAX = 60000;
+            const body = raw.length > MAX
+              ? raw.slice(0, MAX) + "\n... (truncated - see workflow run for full output)"
+              : raw;
+            const marker = `<!-- tf-plan:${env} -->`;
+            const commentBody = [
+              marker,
+              `### Terraform Plan — \`${env}\` (${status})`,
+              "<details><summary>Show plan</summary>",
+              "",
+              "```diff",
+              body,
+              "```",
+              "</details>",
+              "",
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join("\n");
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: commentBody,
+              });
+            }
+
+      - name: Fail if plan errored
+        if: steps.plan.outputs.exitcode == '1'
+        run: exit 1
+
+  final-approval:
+    needs: [plan, detect-envs]
+    strategy:
+      matrix:
+        env: ${{ fromJSON(needs.detect-envs.outputs.envs) }}
+    runs-on: [self-hosted, codebuild-ephemeral]
+    environment: ${{ matrix.env }}-apply-approval
+    steps:
+      - run: echo "Final approval passed for ${{ matrix.env }}"
+
+  # needs: [final-approval] alone blocks until EVERY matrix shard of final-approval has
+  # been approved - i.e. every affected environment's reviewers, not just one.
+  automerge:
+    needs: final-approval
+    runs-on: [self-hosted, codebuild-ephemeral]
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const expectedSha = context.payload.pull_request.head.sha;
+
+            // Guard against a race where new commits landed on the PR after this run
+            // started (e.g. someone force-pushed mid-approval) - merging the wrong SHA
+            // would ship code nobody actually approved.
+            const { data: fresh } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            if (fresh.head.sha !== expectedSha) {
+              core.setFailed(`PR head changed since this run started (${expectedSha} -> ${fresh.head.sha}); aborting merge - a new run must approve the new commits.`);
+              return;
+            }
+
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              merge_method: "squash",
+              sha: fresh.head.sha,
+            });

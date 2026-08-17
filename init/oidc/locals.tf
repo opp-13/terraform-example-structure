@@ -1,9 +1,8 @@
 locals {
   common_tags = {
     Owner       = var.owner
-    Zone        = var.zone
+    Zone        = "oidc"
     Project     = var.project
     Environment = var.environment
-    ManagedBy   = var.mangedby
   }
 }

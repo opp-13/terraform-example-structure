@@ -21,21 +21,29 @@ variable "environment" {
 variable "mangedby" {
   description = "Resource manager"
   type        = string
-  default = "terraform"
+  default     = "terraform"
 }
 
 variable "aws_profile" {
   description = "Named AWS CLI profile to use. Leave null to fall back to the default AWS credential chain."
   type        = string
+  default     = null
+}
+
+variable "oidc_role_arn" {
+  description = "IAM role ARN to assume via GitHub OIDC web-identity federation for this environment's actual resource deployment (CI only, from init/oidc's apply_role_arn/plan_role_arn output). Leave null for local applies, which use var.aws_profile instead."
+  type        = string
+  default     = null
+}
+
+variable "web_identity_token_file" {
+  description = "Path to a file containing the GitHub Actions OIDC ID token (CI only, paired with var.oidc_role_arn). Leave null for local applies."
+  type        = string
+  default     = null
 }
 
 variable "region" {
   description = "AWS region"
-  type        = string
-}
-
-variable "key_pair_name" {
-  description = "Name of an existing EC2 key pair (created in the AWS console) to use for SSH access to the bastion"
   type        = string
 }
 
@@ -67,12 +75,3 @@ variable "bastion_ssh_cidr" {
   type        = string
 }
 
-variable "domain_name" {
-  description = "Domain name to look up an existing ISSUED ACM certificate for. Can be a wildcard (e.g. \"example.com\" or \"*.example.com\") — must match the cert's DomainName exactly."
-  type        = string
-}
-
-variable "base_domain_name" {
-  description = "Apex domain name (never a wildcard, e.g. \"example.com\") used to look up the public Route53 hosted zone and to build the root/www A records."
-  type        = string
-}

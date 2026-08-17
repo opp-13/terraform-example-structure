@@ -10,7 +10,7 @@ terraform {
 
   backend "s3" {
     bucket       = "terraform-state-example-s6john"
-    key          = "env/poc/terraform.tfstate"
+    key          = "connection/terraform.tfstate"
     region       = "ap-northeast-2"
     encrypt      = true
     use_lockfile = true

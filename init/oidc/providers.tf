@@ -1,0 +1,8 @@
+provider "aws" {
+  region  = "ap-northeast-2"
+  profile = var.env_aws_profile
+
+  default_tags {
+    tags = local.common_tags
+  }
+}
